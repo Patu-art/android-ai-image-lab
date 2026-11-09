@@ -63,7 +63,7 @@ textarea{min-height:100px;resize:vertical}
 
 <section class="panel">
 <label class="label">03 · GENERATION MODEL</label>
-<select id="model"><option value="gpt-image-2.6-flare">Puter image editing · default model</option></select>
+<select id="model"><option value="gpt-image-2.5-flare">OpenAI GPT Image 2.5 · image editing</option></select>
 <p class="small">Puter provides a free monthly allowance per account, not a guaranteed daily quota. Usage depends on model and image size. This app does not add payment details or silently switch to a paid fallback.</p>
 <div class="actions"><button id="generate" disabled>Generate image</button></div>
 </section>
@@ -103,7 +103,7 @@ $('accountBtn').addEventListener('click',async()=>{
   catch(e){status('Sign-in was cancelled or failed: '+(e.message||e));}
 });
 async function loadModels(){
-  $('model').value='gpt-image-2.6-flare';
+  $('model').value='gpt-image-2.5-flare';
   $('generate').disabled=!selectedFile;
   status('Ready. Connect your Puter account to use its free monthly allowance. If the allowance is exhausted, stop rather than upgrading.');
 }
