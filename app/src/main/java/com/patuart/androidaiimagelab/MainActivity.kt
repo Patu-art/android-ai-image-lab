@@ -1,146 +1,117 @@
 package com.patuart.androidaiimagelab
 
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
+import android.app.Dialog
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
+import android.view.ViewGroup
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.webkit.WebViewAssetLoader
+import java.io.BufferedReader
 
 class MainActivity : ComponentActivity() {
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private val imagePicker = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        fileChooserCallback?.onReceiveValue(uri?.let { arrayOf(it) })
+        fileChooserCallback = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    ImageLabScreen()
-                }
-            }
-        }
-    }
-}
 
-@Composable
-private fun ImageLabScreen() {
-    val context = LocalContext.current
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
-    var preview by remember { mutableStateOf<Bitmap?>(null) }
-    var status by remember { mutableStateOf("Choose a photo to begin. It stays on this device.") }
-    var loading by remember { mutableStateOf(false) }
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
 
-    val picker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        selectedUri = uri
-        preview = null
-        if (uri == null) {
-            status = "No photo selected."
-        } else {
-            loading = true
-            status = "Loading photo locally…"
-        }
-    }
+        val webView = createWebView(assetLoader)
+        setContentView(webView)
 
-    LaunchedEffect(selectedUri) {
-        val uri = selectedUri ?: return@LaunchedEffect
-        loading = true
-        preview = try {
-            withContext(Dispatchers.IO) {
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    decoder.isMutableRequired = false
-                    // Keep the initial preview modest to avoid exhausting device memory.
-                    val maxSide = 1280
-                    val scale = minOf(1f, maxSide.toFloat() / maxOf(info.size.width, info.size.height))
-                    if (scale < 1f) {
-                        decoder.setTargetSize(
-                            (info.size.width * scale).toInt(),
-                            (info.size.height * scale).toInt()
-                        )
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            status = "Couldn't open that image. Please choose another photo."
+        val html = assets.open("index.html").bufferedReader().use(BufferedReader::readText)
+        webView.loadDataWithBaseURL(
+            "https://appassets.androidplatform.net/assets/",
+            html,
+            "text/html",
+            "UTF-8",
             null
-        }
-        if (preview != null) status = "Photo loaded locally. Editing tools are being built."
-        loading = false
+        )
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("AI Image Lab", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Private, on-device image editing",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(Modifier.height(24.dp))
+    private fun createWebView(assetLoader: WebViewAssetLoader): WebView {
+        return WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = true
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            settings.setSupportMultipleWindows(true)
 
-        Button(
-            onClick = {
-                picker.launch(
-                    androidx.activity.result.PickVisualMediaRequest(
-                        ActivityResultContracts.PickVisualMedia.ImageOnly
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    request: WebResourceRequest
+                ) = assetLoader.shouldInterceptRequest(request.url)
+            }
+
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    this@MainActivity.fileChooserCallback?.onReceiveValue(null)
+                    this@MainActivity.fileChooserCallback = filePathCallback
+                    imagePicker.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
                     )
-                )
-            },
-            enabled = !loading
-        ) {
-            Text(if (preview == null) "Choose photo" else "Choose another photo")
+                    return true
+                }
+
+                override fun onCreateWindow(
+                    view: WebView?,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: android.os.Message?
+                ): Boolean {
+                    val popup = WebView(this@MainActivity).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        webViewClient = WebViewClient()
+                    }
+                    val dialog = Dialog(this@MainActivity)
+                    dialog.setContentView(popup)
+                    dialog.window?.setLayout(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    popup.webChromeClient = object : WebChromeClient() {
+                        override fun onCloseWindow(window: WebView?) {
+                            dialog.dismiss()
+                            popup.destroy()
+                        }
+                    }
+                    (resultMsg?.obj as? WebView.WebViewTransport)?.webView = popup
+                    resultMsg?.sendToTarget()
+                    dialog.show()
+                    return true
+                }
+            }
         }
+    }
 
-        Spacer(Modifier.height(16.dp))
-
-        if (loading) {
-            Text("Loading…")
-        }
-
-        preview?.let { bitmap ->
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Selected photo preview",
-                modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
-                contentScale = ContentScale.Fit
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Text(status, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "No account • No upload • No app image gallery",
-            style = MaterialTheme.typography.labelMedium
-        )
+    override fun onBackPressed() {
+        val root = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+        val webView = root.getChildAt(0) as? WebView
+        if (webView?.canGoBack() == true) webView.goBack() else super.onBackPressed()
     }
 }
