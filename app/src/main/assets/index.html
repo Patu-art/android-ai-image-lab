@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101116">
+<title>AI Image Lab</title>
+<script src="https://js.puter.com/v2/"></script>
+<style>
+:root{color-scheme:dark;--bg:#101116;--panel:#1a1c24;--line:#2d303b;--muted:#a5a8b5;--accent:#b6f36b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f7f7fb;font:15px system-ui,-apple-system,sans-serif}
+main{max-width:680px;margin:auto;padding:22px 17px 36px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{font-weight:800;font-size:21px;letter-spacing:-.5px}.brand span{color:var(--accent)}
+button,select,textarea{font:inherit}button{border:0;border-radius:13px;padding:13px 16px;font-weight:700;background:var(--accent);color:#11150d}
+button:disabled{opacity:.45}button.secondary{background:#292c36;color:#f4f4f7;border:1px solid var(--line)}
+h1{font-size:29px;line-height:1.1;margin:10px 0}p{color:var(--muted);line-height:1.5;margin:8px 0 18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:19px;padding:16px;margin:15px 0}
+.label{display:block;font-size:13px;font-weight:700;color:#dfe1e8;margin:0 0 10px}
+.upload{display:flex;min-height:150px;align-items:center;justify-content:center;border:1.5px dashed #515563;border-radius:15px;text-align:center;padding:20px;color:var(--muted)}
+.upload input{display:none}.upload strong{display:block;color:#fff;margin-bottom:5px}
+#source,#result{width:100%;max-height:360px;object-fit:contain;border-radius:13px;background:#0d0e12}
+textarea,select{width:100%;background:#11131a;color:#fff;border:1px solid var(--line);border-radius:12px;padding:13px;outline:none}
+textarea{min-height:100px;resize:vertical}
+.presets{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.preset{background:#22252e;color:#e9eaf0;border:1px solid var(--line);padding:12px;text-align:left;border-radius:12px;font-weight:600}
+.preset.active{border-color:var(--accent);color:var(--accent)}
+.actions{display:flex;gap:10px;margin-top:13px}.actions button{flex:1}
+.small{font-size:12px;color:var(--muted)}.status{padding:12px;border-radius:12px;background:#12141b;color:#cdd0da;line-height:1.45}
+.notice{font-size:12px;color:#bfc2ce;border-left:3px solid var(--accent);padding-left:10px;margin-top:12px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header><div class="brand">AI <span>IMAGE LAB</span></div><button class="secondary" id="accountBtn">Connect account</button></header>
+<h1>Make a new version<br>of your photo.</h1>
+<p>Choose a photo, pick an effect, describe what you want, and let AI transform it.</p>
+
+<section class="panel">
+<label class="label">01 · YOUR PHOTO</label>
+<label class="upload" id="uploadBox">
+  <span><strong>＋ Choose an image</strong>JPG, PNG or WebP · selected from your phone</span>
+  <input id="file" type="file" accept="image/*">
+</label>
+<img id="source" class="hidden" alt="Selected photo">
+</section>
+
+<section class="panel">
+<label class="label">02 · CHOOSE AN EFFECT</label>
+<div class="presets" id="presets">
+<button class="preset active" data-prompt="Create a polished, natural-looking professional portrait. Keep the person recognizably the same and fully clothed.">✨ Studio portrait</button>
+<button class="preset" data-prompt="Change the background to a beautiful cinematic location while keeping the person unchanged and fully clothed.">🌄 New background</button>
+<button class="preset" data-prompt="Apply a tasteful modern fashion editorial look with stylish clothing, keeping the person fully clothed.">👕 Fashion look</button>
+<button class="preset" data-prompt="Transform this photo into a detailed, high-quality digital illustration while preserving the subject's identity and clothing.">🎨 Art style</button>
+<button class="preset" data-prompt="Improve lighting, color balance, sharpness and overall photo quality. Preserve the original person and clothing.">💡 Enhance photo</button>
+<button class="preset" data-prompt="Create a cinematic movie-poster composition from this photo. Keep all people fully clothed.">🎬 Movie poster</button>
+</div>
+<label class="label" style="margin-top:16px">YOUR INSTRUCTIONS</label>
+<textarea id="prompt" maxlength="700" placeholder="Describe the change you want…">Create a polished, natural-looking professional portrait. Keep the person recognizably the same and fully clothed.</textarea>
+<div class="notice">This app supports non-explicit edits. It does not create nude, undressed, or sexualized images of real people.</div>
+</section>
+
+<section class="panel">
+<label class="label">03 · GENERATION MODEL</label>
+<select id="model"><option value="">Checking free image models…</option></select>
+<p class="small">Only models explicitly marked free are shown. Free availability and daily quotas are controlled by the provider and can change.</p>
+<div class="actions"><button id="generate" disabled>Generate image</button></div>
+</section>
+
+<section class="panel">
+<label class="label">04 · RESULT</label>
+<div id="empty" class="status">Your edited image will appear here.</div>
+<img id="result" class="hidden" alt="Generated result">
+<div class="actions hidden" id="resultActions"><button class="secondary" id="openResult">Open full image</button><button id="saveResult">Save image</button></div>
+</section>
+
+<div id="status" class="status" role="status">Loading image models…</div>
+<p class="small">Privacy: the selected photo is sent to Puter and the selected AI provider for editing. Puter may temporarily upload large input files during processing. This app does not create its own image gallery or save originals/results automatically. Review provider terms before uploading sensitive photos.</p>
+</main>
+<script>
+let selectedFile=null, resultUrl=null, freeModels=[];
+const $=id=>document.getElementById(id);
+const status=(s)=>$('status').textContent=s;
+const forbidden=/\b(nude|nudify|nudification|undress|undressing|remove clothes|remove clothing|strip|topless|nsfw|explicit|sexualize|sexualised|sexualized)\b/i;
+
+$('file').addEventListener('change',()=>{
+  const file=$('file').files[0]; if(!file)return;
+  if(!file.type.startsWith('image/')){status('Please choose an image file.');return;}
+  selectedFile=file;
+  const url=URL.createObjectURL(file); $('source').src=url;
+  $('source').classList.remove('hidden'); $('uploadBox').classList.add('hidden');
+  $('generate').disabled=!$('model').value;
+  status('Photo selected. It stays in this screen until you generate.');
+});
+$('presets').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-prompt]');if(!b)return;
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');$('prompt').value=b.dataset.prompt;
+});
+$('accountBtn').addEventListener('click',async()=>{
+  try{await puter.auth.signIn();status('Connected to your Puter account.');}
+  catch(e){status('Sign-in was cancelled or failed: '+(e.message||e));}
+});
+async function loadModels(){
+ try{
+   if(!window.puter){throw new Error('Puter service did not load. Check your internet connection.');}
+   const models=await puter.ai.listModels();
+   freeModels=(models||[]).filter(m=>{
+     const id=String(m.id||m.model||'');
+     const type=String(m.type||m.task||'').toLowerCase();
+     return /:free$/i.test(id) && (!type || type.includes('image'));
+   });
+   const select=$('model');select.innerHTML='';
+   if(!freeModels.length){
+     select.innerHTML='<option value="">No free image model currently listed</option>';
+     status('No free image-editing model is currently listed by the provider. Check again later; this app will not silently use a paid model.');
+     return;
+   }
+   freeModels.forEach(m=>{
+     const id=m.id||m.model;const o=document.createElement('option');o.value=id;o.textContent=m.name||id;select.appendChild(o);
+   });
+   $('generate').disabled=!selectedFile;
+   status('Found '+freeModels.length+' free image model option(s). Sign in to generate.');
+ }catch(e){$('model').innerHTML='<option value="">Could not load free models</option>';status('Could not load the free model list: '+(e.message||e));}
+}
+$('model').addEventListener('change',()=>{$('generate').disabled=!selectedFile||!$('model').value;});
+$('generate').addEventListener('click',async()=>{
+ if(!selectedFile){status('Choose a photo first.');return;}
+ const prompt=$('prompt').value.trim();if(!prompt){status('Describe the edit first.');return;}
+ if(forbidden.test(prompt)){status('That instruction is not supported. Please use a non-explicit photo edit.');return;}
+ if(!puter.auth.isSignedIn()){
+   status('Connect your Puter account first.');return;
+ }
+ const model=$('model').value;if(!model){status('No free model is available right now.');return;}
+ $('generate').disabled=true;$('empty').classList.remove('hidden');$('empty').textContent='Generating… This may take a few minutes.';
+ $('result').classList.add('hidden');$('resultActions').classList.add('hidden');
+ status('Sending the photo to the selected AI provider for editing…');
+ try{
+   const output=await puter.ai.txt2img(prompt,{model,input_image:selectedFile});
+   resultUrl=output.src;
+   $('result').src=resultUrl;$('result').classList.remove('hidden');$('empty').classList.add('hidden');$('resultActions').classList.remove('hidden');
+   status('Finished. Your result is ready. Use Save image to keep a copy.');
+ }catch(e){$('empty').textContent='Generation failed.';status('Generation failed: '+(e.message||e)+'. Free model quotas can run out or a provider may be temporarily unavailable.');}
+ finally{$('generate').disabled=!selectedFile||!$('model').value;}
+});
+$('openResult').addEventListener('click',()=>{if(resultUrl)window.open(resultUrl,'_blank');});
+$('saveResult').addEventListener('click',()=>{
+ if(!resultUrl)return;
+ const a=document.createElement('a');a.href=resultUrl;a.download='ai-image-lab-result.png';a.target='_blank';document.body.appendChild(a);a.click();a.remove();
+});
+loadModels();
+</script>
+</body></html>
