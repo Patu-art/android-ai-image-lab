@@ -63,8 +63,8 @@ textarea{min-height:100px;resize:vertical}
 
 <section class="panel">
 <label class="label">03 · GENERATION MODEL</label>
-<select id="model"><option value="">Checking free image models…</option></select>
-<p class="small">Only models explicitly marked free are shown. Free availability and daily quotas are controlled by the provider and can change.</p>
+<select id="model"><option value="gpt-image-2.6-flare">Puter image editing · default model</option></select>
+<p class="small">Puter provides a free monthly allowance per account, not a guaranteed daily quota. Usage depends on model and image size. This app does not add payment details or silently switch to a paid fallback.</p>
 <div class="actions"><button id="generate" disabled>Generate image</button></div>
 </section>
 
@@ -79,7 +79,7 @@ textarea{min-height:100px;resize:vertical}
 <p class="small">Privacy: the selected photo is sent to Puter and the selected AI provider for editing. Puter may temporarily upload large input files during processing. This app does not create its own image gallery or save originals/results automatically. Review provider terms before uploading sensitive photos.</p>
 </main>
 <script>
-let selectedFile=null, resultUrl=null, freeModels=[];
+let selectedFile=null, resultUrl=null;
 const $=id=>document.getElementById(id);
 const status=(s)=>$('status').textContent=s;
 const forbidden=/\b(nude|nudify|nudification|undress|undressing|remove clothes|remove clothing|strip|topless|nsfw|explicit|sexualize|sexualised|sexualized)\b/i;
@@ -103,26 +103,9 @@ $('accountBtn').addEventListener('click',async()=>{
   catch(e){status('Sign-in was cancelled or failed: '+(e.message||e));}
 });
 async function loadModels(){
- try{
-   if(!window.puter){throw new Error('Puter service did not load. Check your internet connection.');}
-   const models=await puter.ai.listModels();
-   freeModels=(models||[]).filter(m=>{
-     const id=String(m.id||m.model||'');
-     const type=String(m.type||m.task||'').toLowerCase();
-     return /:free$/i.test(id) && (!type || type.includes('image'));
-   });
-   const select=$('model');select.innerHTML='';
-   if(!freeModels.length){
-     select.innerHTML='<option value="">No free image model currently listed</option>';
-     status('No free image-editing model is currently listed by the provider. Check again later; this app will not silently use a paid model.');
-     return;
-   }
-   freeModels.forEach(m=>{
-     const id=m.id||m.model;const o=document.createElement('option');o.value=id;o.textContent=m.name||id;select.appendChild(o);
-   });
-   $('generate').disabled=!selectedFile;
-   status('Found '+freeModels.length+' free image model option(s). Sign in to generate.');
- }catch(e){$('model').innerHTML='<option value="">Could not load free models</option>';status('Could not load the free model list: '+(e.message||e));}
+  $('model').value='gpt-image-2.6-flare';
+  $('generate').disabled=!selectedFile;
+  status('Ready. Connect your Puter account to use its free monthly allowance. If the allowance is exhausted, stop rather than upgrading.');
 }
 $('model').addEventListener('change',()=>{$('generate').disabled=!selectedFile||!$('model').value;});
 $('generate').addEventListener('click',async()=>{
@@ -140,7 +123,7 @@ $('generate').addEventListener('click',async()=>{
    const output=await puter.ai.txt2img(prompt,{model,input_image:selectedFile});
    resultUrl=output.src;
    $('result').src=resultUrl;$('result').classList.remove('hidden');$('empty').classList.add('hidden');$('resultActions').classList.remove('hidden');
-   status('Finished. Your result is ready. Use Save image to keep a copy.');
+   status('Finished. Your result is ready. Use Save image to keep a copy. The provider controls its own retention and usage limits.');
  }catch(e){$('empty').textContent='Generation failed.';status('Generation failed: '+(e.message||e)+'. Free model quotas can run out or a provider may be temporarily unavailable.');}
  finally{$('generate').disabled=!selectedFile||!$('model').value;}
 });
