@@ -64,7 +64,7 @@ textarea{min-height:100px;resize:vertical}
 <section class="panel">
 <label class="label">03 · GENERATION MODEL</label>
 <select id="model"><option value="gpt-image-2.6-flare">Puter image editing · default model</option></select>
-<p class="small">Puter provides a free monthly allowance per account, not a guaranteed daily quota. Usage depends on model and image size. This app does not add payment details or silently switch to a paid fallback.</p>
+<p class="small">This uses Puter’s image-editing service. Availability and cost depend on your Puter account, model and current allowance; generations are not guaranteed to be free. This app does not add payment details or silently switch to another model.</p>
 <div class="actions"><button id="generate" disabled>Generate image</button></div>
 </section>
 
@@ -82,7 +82,7 @@ textarea{min-height:100px;resize:vertical}
 let selectedFile=null, resultUrl=null;
 const $=id=>document.getElementById(id);
 const status=(s)=>$('status').textContent=s;
-const forbidden=/\b(nude|nudify|nudification|undress|undressing|remove clothes|remove clothing|strip|topless|nsfw|explicit|sexualize|sexualised|sexualized)\b/i;
+const forbidden=/\b(nude|nudify|nudification|undress|undressing|remove clothes|remove clothing|strip|topless|nsfw|explicit|sexualize|sexualised|sexualized)\b/i;\nconst allowedTypes=["image/jpeg","image/png","image/webp","image/gif"];\nconst MAX_IMAGE_BYTES=32*1024*1024;
 
 $('file').addEventListener('change',()=>{
   const file=$('file').files[0]; if(!file)return;
@@ -91,7 +91,7 @@ $('file').addEventListener('change',()=>{
   const url=URL.createObjectURL(file); $('source').src=url;
   $('source').classList.remove('hidden'); $('uploadBox').classList.add('hidden');
   $('generate').disabled=!$('model').value;
-  status('Photo selected. It stays in this screen until you generate.');
+  status('Photo selected. It will be sent to Puter and the selected AI provider only when you press Generate.');
 });
 $('presets').addEventListener('click',e=>{
   const b=e.target.closest('button[data-prompt]');if(!b)return;
@@ -105,7 +105,7 @@ $('accountBtn').addEventListener('click',async()=>{
 async function loadModels(){
   $('model').value='gpt-image-2.6-flare';
   $('generate').disabled=!selectedFile;
-  status('Ready. Connect your Puter account to use its free monthly allowance. If the allowance is exhausted, stop rather than upgrading.');
+  if(!window.puter){status('Puter could not load. Check your internet connection, then reload this page.');$('generate').disabled=true;return;}\n  status('Ready. Connect your Puter account before generating. Check any usage or cost prompt shown by Puter before approving.');
 }
 $('model').addEventListener('change',()=>{$('generate').disabled=!selectedFile||!$('model').value;});
 $('generate').addEventListener('click',async()=>{
@@ -127,7 +127,7 @@ $('generate').addEventListener('click',async()=>{
  }catch(e){$('empty').textContent='Generation failed.';status('Generation failed: '+(e.message||e)+'. Free model quotas can run out or a provider may be temporarily unavailable.');}
  finally{$('generate').disabled=!selectedFile||!$('model').value;}
 });
-$('openResult').addEventListener('click',()=>{if(resultUrl)window.open(resultUrl,'_blank');});
+$('openResult').addEventListener('click',()=>{if(resultUrl)window.open(resultUrl,'_blank','noopener');});
 $('saveResult').addEventListener('click',()=>{
  if(!resultUrl)return;
  const a=document.createElement('a');a.href=resultUrl;a.download='ai-image-lab-result.png';a.target='_blank';document.body.appendChild(a);a.click();a.remove();
