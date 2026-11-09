@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         val webView = createWebView(assetLoader)
         setContentView(webView)
 
-        val html = assets.open("index.html").bufferedReader().use(BufferedReader::readText)
+        val html = assets.open("index.html").bufferedReader().use { it.readText() }
         webView.loadDataWithBaseURL(
             "https://appassets.androidplatform.net/assets/",
             html,
